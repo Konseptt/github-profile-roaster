@@ -56,8 +56,8 @@ export async function POST(req: Request) {
 
         const analysisText = capAnalysisText(bundleToAnalysisText(bundle));
         const maxTokens = Math.min(
-          Number(process.env.NVIDIA_MAX_TOKENS ?? "8192"),
-          16384
+          Number(process.env.NVIDIA_MAX_TOKENS ?? "1200"),
+          4096
         );
 
         const stream = await openai.chat.completions.create({
@@ -71,7 +71,7 @@ export async function POST(req: Request) {
           ],
           temperature: 1,
           top_p: 1,
-          max_tokens: Number.isFinite(maxTokens) ? maxTokens : 8192,
+          max_tokens: Number.isFinite(maxTokens) ? maxTokens : 1200,
           stream: true,
         });
 
