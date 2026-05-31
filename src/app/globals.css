@@ -1,26 +1,176 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --paper: #f5f0d8;
+  --ink: #1a1008;
+  --link: #0000cc;
+  --link-visited: #660099;
+  --rule: #8b7355;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+* {
+  box-sizing: border-box;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html,
+body {
+  margin: 0;
+  padding: 0;
+  min-height: 100%;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: Georgia, "Times New Roman", Times, serif;
+  font-size: 17px;
+  line-height: 1.55;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background-image: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 27px,
+    rgba(139, 115, 85, 0.08) 27px,
+    rgba(139, 115, 85, 0.08) 28px
+  );
+}
+
+a {
+  color: var(--link);
+}
+
+a:visited {
+  color: var(--link-visited);
+}
+
+.site {
+  max-width: 42rem;
+  margin: 0 auto;
+  padding: 2rem 1.25rem 3rem;
+}
+
+header h1 {
+  font-size: 1.75rem;
+  font-weight: normal;
+  letter-spacing: 0.02em;
+  margin: 0.25rem 0 0.5rem;
+  text-decoration: underline;
+  text-decoration-style: wavy;
+  text-decoration-color: #c44;
+}
+
+.tagline {
+  font-style: italic;
+  margin: 0 0 1rem;
+}
+
+.blink {
+  font-family: "Courier New", Courier, monospace;
+  font-size: 0.85rem;
+  animation: blink 1.2s step-end infinite;
+}
+
+@keyframes blink {
+  50% {
+    opacity: 0.35;
+  }
+}
+
+hr {
+  border: none;
+  border-top: 1px dashed var(--rule);
+  margin: 1.25rem 0;
+}
+
+.form-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.75rem 1rem;
+  margin: 1rem 0;
+  font-family: "Courier New", Courier, monospace;
+}
+
+.form-row label {
+  display: flex;
+  align-items: baseline;
+  gap: 0.25rem;
+}
+
+input[type="text"] {
+  font: inherit;
+  font-family: "Courier New", Courier, monospace;
+  background: #fffef5;
+  border: 2px solid var(--ink);
+  border-right-color: #666;
+  border-bottom-color: #666;
+  padding: 0.2rem 0.4rem;
+  min-width: 10rem;
+  outline: none;
+}
+
+input[type="text"]:focus {
+  background: #fff;
+}
+
+button {
+  font-family: "Courier New", Courier, monospace;
+  font-size: 0.95rem;
+  background: #ddd8c4;
+  border: 2px outset #ccc;
+  padding: 0.15rem 0.6rem;
+  cursor: pointer;
+  color: var(--ink);
+}
+
+button:active {
+  border-style: inset;
+}
+
+button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+button.stop {
+  background: #e8c4c4;
+}
+
+.wait {
+  font-family: "Courier New", Courier, monospace;
+  font-size: 0.9rem;
+}
+
+.err {
+  color: #8b0000;
+  font-weight: bold;
+  font-family: "Courier New", Courier, monospace;
+}
+
+.result h2 {
+  font-size: 1.1rem;
+  font-weight: normal;
+  text-transform: lowercase;
+  margin: 1.5rem 0 0.5rem;
+}
+
+.result pre {
+  font-family: "Courier New", Courier, monospace;
+  font-size: 0.92rem;
+  white-space: pre-wrap;
+  word-break: break-word;
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  border: none;
+}
+
+footer {
+  margin-top: 2.5rem;
+  font-size: 0.85rem;
+  color: #4a3f30;
+}
+
+.fine {
+  font-size: 0.8rem;
+  font-style: italic;
 }
