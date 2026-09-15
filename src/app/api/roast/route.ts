@@ -61,7 +61,7 @@ export async function POST(req: Request) {
         );
 
         const stream = await openai.chat.completions.create({
-          model: process.env.NVIDIA_MODEL ?? "z-ai/glm-5.1",
+          model: process.env.NVIDIA_MODEL ?? "meta/llama-3.3-70b-instruct",
           messages: [
             { role: "system", content: ROAST_SYSTEM },
             {
