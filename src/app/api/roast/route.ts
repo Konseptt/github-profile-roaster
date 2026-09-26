@@ -9,6 +9,12 @@ import { ROAST_SYSTEM, buildRoastUserMessage } from "@/lib/roast-prompt";
 import { STREAM_ERROR_PREFIX } from "@/lib/constants";
 import { parseRoastBody, publicError } from "@/lib/security";
 
+function usableReply(text: string | null | undefined): string {
+  const trimmed = text?.trim() ?? "";
+  if (!trimmed || /^!+$/.test(trimmed)) return "";
+  return trimmed;
+}
+
 export const runtime = "nodejs";
 export const maxDuration = 120;
 
@@ -69,9 +75,13 @@ export async function POST(req: Request) {
           top_p: 0.95,
           max_tokens: 1024,
           stream: false,
-        });
+          reasoning_effort: "low",
+        } as OpenAI.Chat.ChatCompletionCreateParamsNonStreaming);
 
-        const text = completion.choices[0]?.message?.content ?? "";
+        const message = completion.choices[0]?.message as
+          | { content?: string | null; reasoning_content?: string | null }
+          | undefined;
+        const text = usableReply(message?.content) || usableReply(message?.reasoning_content);
         if (text) controller.enqueue(encoder.encode(text));
         controller.close();
       } catch (err) {
