@@ -89,7 +89,7 @@ export async function POST(req: Request) {
         const detail =
           err instanceof Error ? err.message : "Roast generation failed";
         const message =
-          process.env.NODE_ENV === "production"
+          process.env.NODE_ENV === "production" && !detail.startsWith("GitHub")
             ? "Could not complete roast"
             : detail;
         fail(message);

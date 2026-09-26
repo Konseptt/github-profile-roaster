@@ -233,18 +233,32 @@ export function isValidGitHubUsername(username: string): boolean {
   return /^[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?$/.test(username);
 }
 
-export async function fetchGitHubProfile(
-  username: string
-): Promise<GitHubProfileBundle | null> {
-  if (!githubToken()) {
-    throw new Error(githubAuthHint());
-  }
+async function githubGet(path: string, token?: string): Promise<Response> {
+  const headers: HeadersInit = {
+    Accept: "application/vnd.github+json",
+    "User-Agent": "github-profile-roaster",
+    "X-GitHub-Api-Version": "2022-11-28",
+  };
+  if (token) headers.Authorization = `Bearer ${token}`;
+  return fetch(`https://api.github.com${path}`, {
+    headers,
+    cache: "no-store",
+    signal: AbortSignal.timeout(GITHUB_TIMEOUT_MS),
+  });
+}
 
+async function fetchViaGraphQL(
+  username: string,
+  token: string
+): Promise<GitHubProfileBundle | null> {
   let res: Response;
   try {
     res = await fetch(GITHUB_GRAPHQL, {
       method: "POST",
-      headers: githubHeaders(),
+      headers: {
+        ...githubHeaders(),
+        Authorization: `Bearer ${token}`,
+      },
       cache: "no-store",
       signal: AbortSignal.timeout(GITHUB_TIMEOUT_MS),
       body: JSON.stringify({
@@ -258,6 +272,10 @@ export async function fetchGitHubProfile(
   }
 
   const body = (await res.json()) as GraphQLResponse;
+
+  if (res.status === 401) {
+    throw new Error("GitHub request failed (401)");
+  }
 
   if (res.status === 403 || res.status === 429) {
     throw new Error(body.message?.includes("rate limit") ? githubAuthHint() : `GitHub blocked request (${res.status})`);
@@ -278,6 +296,145 @@ export async function fetchGitHubProfile(
   }
 
   return mapGraphQLUser(user);
+}
+
+function decodeReadme(payload: { content?: string; encoding?: string } | null): string | null {
+  if (!payload?.content || payload.encoding !== "base64") return null;
+  return Buffer.from(payload.content.replace(/\n/g, ""), "base64").toString("utf8");
+}
+
+async function fetchPublicProfile(username: string): Promise<GitHubProfileBundle | null> {
+  const userRes = await githubGet(`/users/${encodeURIComponent(username)}`);
+  if (userRes.status === 404) return null;
+  if (userRes.status === 403 || userRes.status === 429) {
+    throw new Error(githubAuthHint());
+  }
+  if (!userRes.ok) {
+    throw new Error(`GitHub request failed (${userRes.status})`);
+  }
+
+  const user = (await userRes.json()) as {
+    login: string;
+    name: string | null;
+    bio: string | null;
+    location: string | null;
+    blog: string | null;
+    public_repos: number;
+    followers: number;
+    following: number;
+    created_at: string;
+    html_url: string;
+  };
+
+  const reposRes = await githubGet(
+    `/users/${encodeURIComponent(username)}/repos?sort=updated&per_page=${MAX_REPOS}&type=owner`
+  );
+  if (!reposRes.ok) {
+    throw new Error(reposRes.status === 403 ? githubAuthHint() : `GitHub request failed (${reposRes.status})`);
+  }
+  const repoJson = await reposRes.json();
+  const repoList = (Array.isArray(repoJson) ? repoJson : []) as Array<{
+    name: string;
+    description: string | null;
+    language: string | null;
+    stargazers_count: number;
+    forks_count: number;
+    pushed_at: string | null;
+    topics?: string[];
+  }>;
+
+  const [profileReadme, details, eventsRes] = await Promise.all([
+    githubGet(`/repos/${encodeURIComponent(username)}/${encodeURIComponent(username)}/readme`).then(async (res) =>
+      res.ok ? decodeReadme(await res.json()) : null
+    ),
+    Promise.all(
+      repoList.map(async (repo) => {
+        const [readmeRes, commitsRes] = await Promise.all([
+          githubGet(`/repos/${encodeURIComponent(username)}/${encodeURIComponent(repo.name)}/readme`),
+          githubGet(`/repos/${encodeURIComponent(username)}/${encodeURIComponent(repo.name)}/commits?per_page=3`),
+        ]);
+        const readme = readmeRes.ok ? decodeReadme(await readmeRes.json()) : null;
+        const commits = commitsRes.ok
+          ? ((await commitsRes.json()) as Array<{
+              commit?: { message?: string; author?: { date?: string } };
+            }>)
+          : [];
+        return {
+          name: repo.name,
+          description: repo.description,
+          language: repo.language,
+          stargazers_count: repo.stargazers_count,
+          forks_count: repo.forks_count,
+          pushed_at: repo.pushed_at,
+          topics: repo.topics ?? [],
+          languages: repo.language ? { [repo.language]: 1 } : {},
+          readmeExcerpt: readme,
+          recentCommits: commits
+            .map((commit) => ({
+              message: commit.commit?.message?.split("\n")[0] ?? "",
+              date: commit.commit?.author?.date ?? "",
+            }))
+            .filter((commit) => commit.message),
+        };
+      })
+    ),
+    githubGet(`/users/${encodeURIComponent(username)}/events/public?per_page=12`),
+  ]);
+
+  const events = eventsRes.ok
+    ? ((await eventsRes.json()) as Array<{
+        type?: string;
+        created_at?: string;
+        repo?: { name?: string };
+      }>)
+    : [];
+
+  const languageTotals: Record<string, number> = {};
+  for (const repo of details) {
+    for (const [lang, bytes] of Object.entries(repo.languages)) {
+      languageTotals[lang] = (languageTotals[lang] ?? 0) + bytes;
+    }
+  }
+
+  return {
+    user: {
+      login: user.login,
+      name: user.name,
+      bio: user.bio,
+      location: user.location,
+      blog: user.blog,
+      public_repos: user.public_repos,
+      followers: user.followers,
+      following: user.following,
+      created_at: user.created_at,
+      html_url: user.html_url,
+    },
+    profileReadme,
+    repos: details,
+    recentEvents: events
+      .filter((event) => event.type && event.repo?.name && event.created_at)
+      .map((event) => ({
+        type: event.type as string,
+        repo: event.repo?.name as string,
+        created_at: event.created_at as string,
+      })),
+    languageTotals,
+  };
+}
+
+export async function fetchGitHubProfile(
+  username: string
+): Promise<GitHubProfileBundle | null> {
+  const token = githubToken();
+  if (token) {
+    try {
+      return await fetchViaGraphQL(username, token);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "";
+      if (!message.includes("401")) throw err;
+    }
+  }
+  return fetchPublicProfile(username);
 }
 
 export function bundleToAnalysisText(bundle: GitHubProfileBundle): string {
