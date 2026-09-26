@@ -55,13 +55,9 @@ export async function POST(req: Request) {
         });
 
         const analysisText = capAnalysisText(bundleToAnalysisText(bundle));
-        const maxTokens = Math.min(
-          Number(process.env.NVIDIA_MAX_TOKENS ?? "1200"),
-          4096
-        );
 
-        const stream = await openai.chat.completions.create({
-          model: process.env.NVIDIA_MODEL ?? "meta/llama-3.3-70b-instruct",
+        const completion = await openai.chat.completions.create({
+          model: "meta/llama-3.3-70b-instruct",
           messages: [
             { role: "system", content: ROAST_SYSTEM },
             {
@@ -69,16 +65,14 @@ export async function POST(req: Request) {
               content: buildRoastUserMessage(analysisText, username),
             },
           ],
-          temperature: 1,
-          top_p: 1,
-          max_tokens: Number.isFinite(maxTokens) ? maxTokens : 1200,
-          stream: true,
+          temperature: 0.2,
+          top_p: 0.7,
+          max_tokens: 1024,
+          stream: false,
         });
 
-        for await (const chunk of stream) {
-          const text = chunk.choices[0]?.delta?.content ?? "";
-          if (text) controller.enqueue(encoder.encode(text));
-        }
+        const text = completion.choices[0]?.message?.content ?? "";
+        if (text) controller.enqueue(encoder.encode(text));
         controller.close();
       } catch (err) {
         const detail =
