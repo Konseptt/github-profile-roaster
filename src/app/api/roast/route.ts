@@ -75,6 +75,7 @@ export async function POST(req: Request) {
         if (text) controller.enqueue(encoder.encode(text));
         controller.close();
       } catch (err) {
+        console.error("roast failed", err instanceof Error ? err.message : err);
         const detail =
           err instanceof Error ? err.message : "Roast generation failed";
         const message =
