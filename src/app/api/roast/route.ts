@@ -57,7 +57,7 @@ export async function POST(req: Request) {
         const analysisText = capAnalysisText(bundleToAnalysisText(bundle));
 
         const completion = await openai.chat.completions.create({
-          model: "meta/llama-3.3-70b-instruct",
+          model: "moonshotai/kimi-k3",
           messages: [
             { role: "system", content: ROAST_SYSTEM },
             {
@@ -65,8 +65,8 @@ export async function POST(req: Request) {
               content: buildRoastUserMessage(analysisText, username),
             },
           ],
-          temperature: 0.2,
-          top_p: 0.7,
+          temperature: 1,
+          top_p: 0.95,
           max_tokens: 1024,
           stream: false,
         });
